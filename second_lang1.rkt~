@@ -1,0 +1,40 @@
+#lang plai-typed
+(define-type ExprC
+  [numC  (n : number)]
+  [idC (id : symbol)]
+  [appC (fun : symbol) (arg : ExprC)]
+  [plusC  (l : ExprC) (r : ExprC)]
+  [multC (l : ExprC) (r : ExprC)]
+  [ifC   (cond : ExprC) (sim : ExprC) (não : ExprC)]
+  [ifgC (conda : ExprC) (condb : ExprC) (sim : ExprC) (não : ExprC)]
+)
+
+(define-type ExprS
+  [numS  (n : number)]
+  [idS (id : symbol)]
+  [appS (fun : symbol) (arg : ExprS)]
+  [plusS  (l : ExprS) (r : ExprS)]
+  [multS (l : ExprS) (r : ExprS)]
+  [ifS   (cond : ExprS) (sim : ExprS) (não : ExprS)]
+  [ifgS (conda : ExprS) (condb : ExprS) (sim : ExprS) (não : ExprS)]
+  [iflS (conda : ExprS) (condb : ExprS) (sim : ExprS) (não : ExprS)]
+  [bminusS (l : ExprS) (r : ExprS)]
+  [uminusS (e : ExprS)]
+)
+
+(define (parse [s : s-expression]) : ExprS
+  (cond
+    [(s-exp-number? s) (numS (s-exp->number s))]
+    [(s-exp-list? s)
+     (let ([sl (s-exp->list s)])
+       (case (s-exp->symbol (first sl))
+         [(+) (plusS (parse (second sl)) (parse (third sl)))]
+         [(*) (multS (parse (second sl)) (parse (third sl)))]
+         [(-) (bminusS (parse (second sl)) (parse (third sl)))]
+         [(~) (uminusS (parse (second sl)))]
+         [(call) (appS (s-exp->symbol (second sl)) (parse (third sl)))]
+         [(if) (ifS (parse (second sl)) (parse (third sl)) (parse (fourth sl)))]
+         [(ifg) (ifgS (parse (second sl)) (parse (third sl)) (parse (fourth sl)) (parse (list-ref sl 4)))]
+         [(ifl) (ifgS (parse (second sl)) (parse (third sl)) (parse (fourth sl)) (parse (list-ref sl 4)))]
+         [else (error 'parse "invalid list input")]))]
+    [else (error 'parse "invalid input")]))
