@@ -1,6 +1,6 @@
 #lang plai-typed
 (define-type FunDefC
-  [fdc (name : symbol) (arg : symbol) (body : ExprC)]
+  [fdC (name : symbol) (arg : symbol) (body : ExprC)]
 )
 
 (define-type ExprC
@@ -57,7 +57,7 @@
     [uminusS (e) (multC (numC -1) (desugar e))]
 ))
 
-;argumento: valor isso: nome da 'variável' a ser substituída em: corpo da função          
+;argumento: valor isso: nome da 'variável' a ser substituída em: corpo da função          inmterp()
 (define (subst [valor : ExprC] [isso : symbol] [em : ExprC]) : ExprC
   (type-case ExprC em
     [numC (n) em] ; nada a substituir
@@ -75,7 +75,7 @@
   (cond
     [(empty? fds) (error 'get-fundef "referência para função não definida")]
     [(cons? fds) (cond
-                   [(equal? n (fdc-name (first fds))) (first fds)] ;achou a função
+                   [(equal? n (fdC-name (first fds))) (first fds)] ;achou a função
                    [else (get-fundef n (rest fds))])]))
 
 (define (interp [a : ExprC] [fds : (listof FunDefC)]) : number
@@ -84,10 +84,22 @@
     [idC (c) (error 'interp "Não deveria enncontrar isto aqui")]
     [appC (f a )
           (local ([define fd (get-fundef f fds)])
-            (interp (subst a (fdc-arg fd) (fdc-body fd)) fds))]
+            (interp (subst a (fdC-arg fd) (fdC-body fd)) fds))]
     [plusC (l r) (+ (interp l fds) (interp r fds))]
     [multC (l r) (* (interp l fds) (interp r fds))]
     [ifC (c s n) (if (zero? (interp c fds)) (interp n fds) (interp s fds))]
     [ifgC (ca cb s n) (if (> (interp ca fds) (interp cb fds)) (interp s fds) (interp n fds))]
      )
  )
+
+(define lf
+    (list
+    [fdC 'double 'x (multC (numC 2) (idC 'x))]
+    [fdC 'quadruple 'x (appC 'double (appC 'double(idC 'x)))]
+    [fdC 'fatorial 'x (ifgC (idC 'x)(numC 1)
+                           (multC (appC 'fatorial (plusC (idC 'x)(numC -1))) (idC 'x)) (numC 1))]
+    ))
+
+(interp(desugar( parse '(call double 1))) lf)
+(interp(desugar( parse '(call quadruple 2)))lf)
+(interp(desugar( parse '(call fatorial 7)))lf)

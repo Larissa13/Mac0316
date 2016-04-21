@@ -1,20 +1,21 @@
 #lang plai-typed
-;escopo dinâmico
+;novo tipo de retorno do interpretador
+(define-type Value
+  [numV (n : number)]
+  [funV (name : symbol) (arg : symbol) (body : ExprC)])
+
 (define-type Binding
-  [bind (name : symbol) (val : number)])
+      [bind (name : symbol) (val : Value)])
 
 (define-type-alias Env (listof Binding))
-(define mt-env empty)
-(define extend-env cons) ;cons é um par (car.cdr)
-
-(define-type FunDefC
-  [fdC (name : symbol) (arg : symbol) (body : ExprC)]
-)
+(define mt-env empty)        
+(define extend-env cons)     
 
 (define-type ExprC
   [numC  (n : number)]
   [idC (id : symbol)]
-  [appC (fun : symbol) (arg : ExprC)]
+  [appC (fun : ExprC) (arg : ExprC)]
+  [fdC (name : symbol) (arg : symbol) (body : ExprC)]
   [plusC  (l : ExprC) (r : ExprC)]
   [multC (l : ExprC) (r : ExprC)]
   [ifC   (cond : ExprC) (sim : ExprC) (não : ExprC)]
@@ -24,7 +25,8 @@
 (define-type ExprS
   [numS  (n : number)]
   [idS (id : symbol)]
-  [appS (fun : symbol) (arg : ExprS)]
+  [appS (fun : ExprS) (arg : ExprS)]
+  [fdS (name : symbol) (arg : symbol) (body : ExprS)]
   [plusS  (l : ExprS) (r : ExprS)]
   [multS (l : ExprS) (r : ExprS)]
   [ifS   (cond : ExprS) (sim : ExprS) (não : ExprS)]
@@ -33,10 +35,23 @@
   [bminusS (l : ExprS) (r : ExprS)]
   [uminusS (e : ExprS)]
 )
+;novos operadores aritméticos
+(define (num+ [l : Value] [r : Value]) : Value
+  (cond [(and (numV? l) (numV? r))
+         (numV (+ (numV-n l) (numV-n r)))]
+        [else (error 'num+ "Um dos argumentos não é número")]
+        ))
+
+(define (num* [l : Value] [r : Value]) : Value
+  (cond [(and (numV? l) (numV? r))
+         (numV (* (numV-n l) (numV-n r)))]
+        [else (error 'num* "Um dos argumentos não é número")]
+        ))
 
 (define (parse [s : s-expression]) : ExprS
   (cond
     [(s-exp-number? s) (numS (s-exp->number s))]
+    [(s-exp-symbol? s) (idS (s-exp->symbol s))] 
     [(s-exp-list? s)
      (let ([sl (s-exp->list s)])
        (case (s-exp->symbol (first sl))
@@ -44,7 +59,8 @@
          [(*) (multS (parse (second sl)) (parse (third sl)))]
          [(-) (bminusS (parse (second sl)) (parse (third sl)))]
          [(~) (uminusS (parse (second sl)))]
-         [(call) (appS (s-exp->symbol (second sl)) (parse (third sl)))]
+         [(call) (appS (parse (second sl)) (parse (third sl)))]
+         [(func) (fdS (s-exp->symbol (second sl)) (s-exp->symbol (third sl)) (parse (fourth sl)))] 
          [(if) (ifS (parse (second sl)) (parse (third sl)) (parse (fourth sl)))]
          [(ifg) (ifgS (parse (second sl)) (parse (third sl)) (parse (fourth sl)) (parse (list-ref sl 4)))]
          [(ifl) (ifgS (parse (second sl)) (parse (third sl)) (parse (fourth sl)) (parse (list-ref sl 4)))]
@@ -57,7 +73,8 @@
     [plusS (l r) (plusC (desugar l) (desugar r))]
     [multS (l r) (multC (desugar l) (desugar r ))]
     [idS (id) (idC id)]
-    [appS (f a) (appC f (desugar a))]
+    [appS (f a) (appC (desugar f) (desugar a))]
+    [fdS (n a b) (fdC n a (desugar b))]
     [ifS (c s n) (ifC (desugar c) (desugar s) (desugar n))]
     [ifgS (ca cb s n) (ifgC (desugar ca) (desugar cb) (desugar s) (desugar n))]
     [iflS (ca cb s n) (ifgC (desugar cb) (desugar ca) (desugar s) (desugar n))]
@@ -65,14 +82,8 @@
     [uminusS (e) (multC (numC -1) (desugar e))]
 ))
 
-(define (get-fundef [n : symbol] [fds : (listof FunDefC)]) : FunDefC
-  (cond
-    [(empty? fds) (error 'get-fundef "referência para função não definida")]
-    [(cons? fds) (cond
-                   [(equal? n (fdC-name (first fds))) (first fds)] ;achou a função
-                   [else (get-fundef n (rest fds))])]))
 
-( define ( lookup [ for : symbol ] [ env : Env ]) : number
+( define ( lookup [ for : symbol ] [ env : Env ]) : Value
    ( cond
       [( empty? env ) ( error 'lookup " name not found " ) ]
       [ else ( cond
@@ -80,31 +91,20 @@
                  ( bind-val ( first env ) ) ]
                 [ else ( lookup for ( rest env ) ) ]) ]) )
 
-(define (interp [a : ExprC] [env : Env] [fds : (listof FunDefC)]) : number
+(define (interp [a : ExprC] [env : Env]) : Value
   (type-case ExprC a
-    [numC (n) n]
+    [numC (n) (numV n)]
     [idC (c) (lookup c env)]
-    [ appC ( f a )
-           ( local ([ define fd ( get-fundef f fds ) ])
-              ( interp (fdC-body fd)
-                       ( extend-env
-                         ( bind ( fdC-arg fd ) ( interp a env fds ) )
-                         env )
-                       fds ) ) ]
-    [plusC (l r) (+ (interp l env fds) (interp r env fds))]
-    [multC (l r) (* (interp l env fds) (interp r env fds))]
-    [ifC (c s n) (if (zero? (interp c env fds)) (interp n env fds) (interp s env fds))]
-    [ifgC (ca cb s n) (if (> (interp ca env fds) (interp cb env fds)) (interp s env fds) (interp n env fds))]
+    [fdC (n a b) (funV n a b)]
+    [appC (f a)
+           (local ([define fd (interp f env)])
+              (interp (funV-body fd)
+                       (extend-env
+                         (bind(funV-arg fd) (interp a env))
+                         mt-env)))]
+    [plusC (l r) (num+ (interp l env) (interp r env))]
+    [multC (l r) (num* (interp l env) (interp r env))]
+    [ifC (c s n) (if (zero? (numV-n(interp c env ))) (interp n env) (interp s env))]
+    [ifgC (ca cb s n) (if (> (numV-n (interp ca env)) (numV-n (interp cb env))) (interp s env) (interp n env))]
      )
  )
-
-(define lf
-    (list
-    [fdC 'double 'x (multC (numC 2) (idC 'x))]
-    [fdC 'quadruple 'x (appC 'double (appC 'double(idC 'x)))]
-    [fdC 'fatorial 'x (ifgC (idC 'x)(numC 1)
-                           (multC (appC 'fatorial (plusC (idC 'x)(numC -1))) (idC 'x)) (numC 1))]
-    [fdC 'f1 'x (appC 'f2 (numC 4))]
-    [fdC 'f2 'y (plusC (idC 'x)(idC 'y))]
-    ))
-

@@ -1,5 +1,4 @@
 #lang plai-typed
-;escopo dinâmico
 (define-type Binding
   [bind (name : symbol) (val : number)])
 
@@ -8,7 +7,7 @@
 (define extend-env cons) ;cons é um par (car.cdr)
 
 (define-type FunDefC
-  [fdC (name : symbol) (arg : symbol) (body : ExprC)]
+  [fdc (name : symbol) (arg : symbol) (body : ExprC)]
 )
 
 (define-type ExprC
@@ -69,7 +68,7 @@
   (cond
     [(empty? fds) (error 'get-fundef "referência para função não definida")]
     [(cons? fds) (cond
-                   [(equal? n (fdC-name (first fds))) (first fds)] ;achou a função
+                   [(equal? n (fdc-name (first fds))) (first fds)] ;achou a função
                    [else (get-fundef n (rest fds))])]))
 
 ( define ( lookup [ for : symbol ] [ env : Env ]) : number
@@ -86,9 +85,9 @@
     [idC (c) (lookup c env)]
     [ appC ( f a )
            ( local ([ define fd ( get-fundef f fds ) ])
-              ( interp (fdC-body fd)
+              ( interp (fdc-body fd)
                        ( extend-env
-                         ( bind ( fdC-arg fd ) ( interp a env fds ) )
+                         ( bind ( fdc-arg fd ) ( interp a env fds ) )
                          env )
                        fds ) ) ]
     [plusC (l r) (+ (interp l env fds) (interp r env fds))]
@@ -97,14 +96,4 @@
     [ifgC (ca cb s n) (if (> (interp ca env fds) (interp cb env fds)) (interp s env fds) (interp n env fds))]
      )
  )
-
-(define lf
-    (list
-    [fdC 'double 'x (multC (numC 2) (idC 'x))]
-    [fdC 'quadruple 'x (appC 'double (appC 'double(idC 'x)))]
-    [fdC 'fatorial 'x (ifgC (idC 'x)(numC 1)
-                           (multC (appC 'fatorial (plusC (idC 'x)(numC -1))) (idC 'x)) (numC 1))]
-    [fdC 'f1 'x (appC 'f2 (numC 4))]
-    [fdC 'f2 'y (plusC (idC 'x)(idC 'y))]
-    ))
 

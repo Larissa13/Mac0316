@@ -1,0 +1,8 @@
+(interpS '(call 
+             (call 
+              (func p 
+                    (call 
+                     (func m (call m m)) 
+                     (func f (call p (func a (call (call f f) a))))
+                     ))
+              (func g (func n (if n (* n (call g (- n 1))) 1)))) 5))
