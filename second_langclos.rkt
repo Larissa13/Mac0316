@@ -85,7 +85,7 @@
 
 ( define ( lookup [ for : symbol ] [ env : Env ]) : Value
    ( cond
-      [( empty? env ) ( error 'lookup " name not found " ) ]
+      [( empty? env ) ( error 'lookup (string-append (symbol->string for) " não foi encontrado") ) ]
       [ else ( cond
                 [( symbol=? for ( bind-name ( first env ) ) )
                  ( bind-val ( first env ) ) ]
@@ -111,4 +111,8 @@
  )
 
 (interp(desugar(parse '( call ( func f ( call f 32) ) ( func x (* x x ) ) )))mt-env)
+(interp(desugar(parse '(call (func f (call (func x (call f 10))2)) (func x (+ x x))))) mt-env)
+(interp(desugar(parse '(call (func f (+ (call f 3) (call f 5))) (func x (+ x x)))))  mt-env)
+(interp(desugar(parse '(call (func f (call f 10)) (func x (+ x x)))))  mt-env)
+(interp(desugar(parse '(call (func x (+ x x)) 10))) mt-env)
 (interp(desugar(parse '(call (func f (func x (call f 10))) (+ x y)))) mt-env)
